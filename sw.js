@@ -3,7 +3,7 @@
    la copia guardada. Así las actualizaciones llegan al instante cuando hay red
    y la app sigue abriéndose sin ella. Nunca toca los datos del usuario, que
    viven en localStorage. */
-const CACHE = 'comidas-v1';
+const CACHE = 'comidas-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './datos/catalogo.js'];
 
 self.addEventListener('install', e => {
