@@ -59,8 +59,11 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--surface);
   border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
 nav button{flex:1;background:none;border:0;padding:8px 2px 10px;font-size:10.5px;letter-spacing:.02em;
   color:var(--ink3);display:flex;flex-direction:column;align-items:center;gap:3px;font-weight:600}
-nav button b{font-size:19px;font-weight:400;line-height:1}
-nav button[aria-current="true"]{color:var(--acc)}
+nav button b{font-size:19px;font-weight:400;line-height:1;padding:3px 16px;border-radius:999px;
+  transition:background .2s}
+nav button:not([aria-current]) b{filter:grayscale(1);opacity:.55}
+nav button[aria-current]{color:var(--acc-ink)}
+nav button[aria-current] b{background:var(--acc-soft)}
 
 /* bloques */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
@@ -109,6 +112,14 @@ nav button[aria-current="true"]{color:var(--acc)}
 .basebtn[aria-pressed="true"]{background:var(--acc-soft);border-color:var(--acc)}
 .basebtn .bn{font-size:13.5px;font-weight:600;line-height:1.2}
 .basebtn .bp{font-size:11.5px;color:var(--ink3)}
+.basebtn[data-base]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+/* «Mantener pulsado» (como en Registrador): se hunde poco a poco mientras se mantiene
+   y, al cumplirse, rebota con un halo. */
+.lp{transition:transform .5s cubic-bezier(.3,0,.8,.6),filter .5s ease}
+.lp.holding{transform:scale(.92);filter:brightness(.92)}
+.lpfired{animation:lppop .32s cubic-bezier(.2,.9,.3,1.4)}
+@keyframes lppop{0%{transform:scale(.9);box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 45%,transparent)}60%{transform:scale(1.04)}100%{transform:scale(1);box-shadow:0 0 0 12px transparent}}
+@media (prefers-reduced-motion:reduce){.lp,.lp.holding{transition:none;transform:none}.lpfired{animation:none}}
 
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);
@@ -235,6 +246,11 @@ function necesidadesBases(w){ // {B1:{pide,hay,falta}}
     const r=receta(id); if(!r) continue;
     for(const b of r.bases||[]) n[b.id]=(n[b.id]||0)+b.porciones;
   }
+  for(const [id,pide] of Object.entries(n)){ // una base que hay que cocinar puede gastar otra (B6 lleva B1)
+    const b=base(id); if(!b.usa) continue;
+    const tandas=Math.ceil(Math.max(0,pide-stock(id))/b.porciones);
+    for(const u of b.usa) n[u.id]=(n[u.id]||0)+u.porciones*tandas;
+  }
   return Object.entries(n).map(([id,pide])=>{
     const hay=stock(id), b=base(id);
     return {id,nombre:b.nombre,pide,hay,falta:Math.max(0,pide-hay),tandas:Math.ceil(Math.max(0,pide-hay)/b.porciones)};
@@ -275,7 +291,7 @@ const TABS=[["hoy","🍽","Hoy"],["cocinar","🥘","Cocinar"],["semana","🗓","
 function ir(v){vista=v;pintar();window.scrollTo(0,0);}
 function pintar(){
   $("#nav").innerHTML=TABS.map(([v,i,n])=>
-    `<button data-ir="${v}" aria-current="${v===vista}"><b>${i}</b>${n}</button>`).join("");
+    `<button data-ir="${v}"${v===vista?' aria-current="page"':""}><b>${i}</b>${n}</button>`).join("");
   const T={hoy:"Hoy",cocinar:"Qué puedo hacer",semana:"Semana",despensa:"Despensa",recetario:"Recetario"};
   $("#ttl").textContent=T[vista];
   $("#sub").textContent=vista==="semana"?SEM.replace("-W"," · semana "):
@@ -336,7 +352,7 @@ function vCocinar(){
         resto=lista.filter(x=>x.f.length>1);
   return `<div class="stack">
     <div class="card stack">
-      <div class="eyebrow">Bases que tienes</div>
+      <div class="eyebrow">Bases que tienes <span style="text-transform:none;letter-spacing:0;font-weight:400">· mantén pulsada una para ver su receta</span></div>
       <div class="grid2">${BASES.map(b=>`<button class="basebtn" data-base="${b.id}" aria-pressed="${disp.has(b.id)}">
         <span class="bn">${b.icono} ${esc(b.nombre)}</span>
         <span class="bp">${b.id} · ${stock(b.id)?stock(b.id)+" porc. en casa":"sin existencias"}</span></button>`).join("")}</div>
@@ -625,6 +641,25 @@ document.addEventListener("change",e=>{
     const i=l.indexOf(d.compra); i<0?l.push(d.compra):l.splice(i,1);guardar();pintar();}
 });
 $("#gear").addEventListener("click",ajustes);
+
+// Pulsación larga (500 ms) sobre una base en «Cocinar»: abre su receta en vez de marcarla.
+let lp={timer:null,fired:false,x:0,y:0,el:null};
+const LP_SEL=".basebtn[data-base]";
+function lpClear(){clearTimeout(lp.timer);lp.timer=null;if(lp.el){lp.el.classList.remove("holding","lp");lp.el=null;}}
+document.addEventListener("pointerdown",ev=>{
+  lp.fired=false;
+  const el=ev.target.closest(LP_SEL); if(!el) return;
+  lp.x=ev.clientX; lp.y=ev.clientY;
+  lp.el=el; el.classList.add("lp"); requestAnimationFrame(()=>{if(lp.el===el)el.classList.add("holding");});
+  lp.timer=setTimeout(()=>{lp.fired=true; if(navigator.vibrate) navigator.vibrate(15);
+    lpClear(); el.classList.add("lpfired"); el.addEventListener("animationend",()=>el.classList.remove("lpfired"),{once:true});
+    fichaBase(el.dataset.base);},500);
+});
+document.addEventListener("pointermove",ev=>{if(lp.timer&&Math.hypot(ev.clientX-lp.x,ev.clientY-lp.y)>10)lpClear();});
+["pointerup","pointercancel"].forEach(t=>document.addEventListener(t,lpClear));
+document.addEventListener("contextmenu",ev=>{if(ev.target.closest(LP_SEL))ev.preventDefault();});
+// el clic que cierra la pulsación larga no debe marcar la base ni cerrar la ficha recién abierta
+document.addEventListener("click",e=>{if(lp.fired){lp.fired=false;e.stopPropagation();e.preventDefault();}},true);
 
 function tema(){const t=D.ajustes.tema;
   if(t==="system")document.documentElement.removeAttribute("data-theme");

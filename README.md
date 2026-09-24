@@ -53,6 +53,8 @@ actualizar la app no la pisa y "Restaurar" siempre devuelve el original.
 - `tests/`: comprobaciones del catálogo (referencias cruzadas entre recetas, bases y
   salsas; que ningún tupper lleve garbanzos o alubias; que nada marcado "congela"
   dependa de huevo cocido). Se ejecutan con `tests/run.sh`, que necesita `gjs`.
+  `tests/raciones.py` estima peso, kcal y proteína por ración para comparar recetas
+  (referencia aproximada: 400–550 kcal por tupper; 1 tarro de lentejas da para 3).
 - `manifest.webmanifest`, `sw.js`, `icon-*.png`: lo que la hace instalable y capaz de
   abrirse sin conexión.
 - `PROPUESTA.md`: el diseño del que salió todo esto.
@@ -92,4 +94,5 @@ restaurar, "Restaurar desde texto".
 Se añade a mano en `datos/catalogo.js`, siguiendo la forma de las que ya están, y se
 ejecuta `./tests/run.sh` antes de publicar. Una receta necesita id, nombre, tipo,
 raciones, minutos, `bases`, `fresco` (con pasillo) y `pasos`; `alDia` para lo que se
-añade el mismo día y `nota` para el aviso de conservación.
+añade el mismo día y `nota` para el aviso de conservación. Para comprobar que la ración
+es razonable, añádela también a `tests/raciones.py` y ejecútalo.
